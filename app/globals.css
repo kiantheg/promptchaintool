@@ -332,9 +332,54 @@ pre {
   place-items: center;
 }
 
+.authLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  gap: var(--space-5);
+  width: min(1120px, 100%);
+}
+
+.authLayoutCompact {
+  grid-template-columns: minmax(0, 520px);
+  justify-content: center;
+}
+
 .authPanel {
-  max-width: 520px;
   padding: 32px;
+}
+
+.authBrandPanel,
+.authActionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.authFeatureList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.authFeatureCard {
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+}
+
+.authFeatureCard .panelTag {
+  display: inline-flex;
+  margin-bottom: 12px;
+}
+
+.authFeatureCard h3,
+.authFeatureCard p {
+  margin: 0;
+}
+
+.authPrimaryButton {
+  align-self: flex-start;
 }
 
 .hero {
@@ -927,6 +972,11 @@ h3 {
   .promptGrid,
   .statsStrip,
   .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .authLayout,
+  .authFeatureList {
     grid-template-columns: 1fr;
   }
 

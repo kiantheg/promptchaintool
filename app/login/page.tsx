@@ -52,18 +52,45 @@ export default function LoginPage() {
 
   return (
     <main className="shell authShell">
-      <section className="authPanel">
-        <p className="eyebrow">Prompt Chain Tool</p>
-        <h1>Admin login</h1>
-        <p className="muted">
-          Sign in with Google, then the app will check your `profiles.is_superadmin` and
-          `profiles.is_matrix_admin` flags.
-        </p>
-        <button type="button" className="primaryButton" onClick={signInWithGoogle} disabled={loading}>
-          {loading ? "Opening Google..." : "Continue with Google"}
-        </button>
-        {message && <p className="errorBanner">{message}</p>}
-      </section>
+      <div className="authLayout">
+        <section className="authPanel authBrandPanel">
+          <p className="eyebrow">Prompt Chain Tool</p>
+          <h1>Humor flavor workspace</h1>
+          <p className="muted sectionNote">
+            Manage humor flavors, test prompt chains, and inspect caption history from one place.
+          </p>
+          <div className="authFeatureList">
+            <article className="authFeatureCard">
+              <span className="panelTag">Edit</span>
+              <h3>Build prompt chains</h3>
+              <p className="muted">Create flavors, reorder steps, and keep the chain structure clean.</p>
+            </article>
+            <article className="authFeatureCard">
+              <span className="panelTag">Test</span>
+              <h3>Preview with images</h3>
+              <p className="muted">Choose public images visually and run generation before publishing changes.</p>
+            </article>
+            <article className="authFeatureCard">
+              <span className="panelTag">History</span>
+              <h3>Review model output</h3>
+              <p className="muted">See saved captions and raw model responses without leaving the workspace.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="authPanel authActionPanel">
+          <p className="eyebrow">Admin Access</p>
+          <h2>Sign in with Google</h2>
+          <p className="muted sectionNote">
+            After login, the app will verify <code>profiles.is_superadmin</code> or{" "}
+            <code>profiles.is_matrix_admin</code> before opening the workspace.
+          </p>
+          <button type="button" className="primaryButton authPrimaryButton" onClick={signInWithGoogle} disabled={loading}>
+            {loading ? "Opening Google..." : "Continue with Google"}
+          </button>
+          {message && <p className="errorBanner">{message}</p>}
+        </section>
+      </div>
     </main>
   );
 }

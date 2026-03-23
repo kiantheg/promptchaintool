@@ -63,9 +63,13 @@ export default function AuthCallbackPage() {
 
   return (
     <main className="shell authShell">
-      <section className="authPanel">
-        <p className="muted">{message}</p>
-      </section>
+      <div className="authLayout authLayoutCompact">
+        <section className="authPanel authActionPanel">
+          <p className="eyebrow">Prompt Chain Tool</p>
+          <h2>Finishing sign-in</h2>
+          <p className="muted sectionNote">{message}</p>
+        </section>
+      </div>
     </main>
   );
 }
