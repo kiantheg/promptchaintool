@@ -185,6 +185,43 @@ pre {
   flex: 0 0 122px;
 }
 
+.themeControl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-strong) 78%, transparent);
+}
+
+.themeControlCompact {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.themeControlLabel {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.themeControlCompact .themeControlLabel {
+  display: none;
+}
+
+.themeControl .themeSelect {
+  margin: 0;
+}
+
+.themeControlCompact .themeSelect {
+  min-height: 40px;
+}
+
 .searchInput {
   flex: 1 1 auto;
 }
@@ -355,6 +392,17 @@ pre {
   gap: var(--space-4);
 }
 
+.authTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+}
+
+.authTopRowMobileOnly {
+  display: none;
+}
+
 .authFeatureList {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -451,11 +499,16 @@ pre {
 }
 
 .heroActions .ghostButton,
-.heroActions .primaryLinkButton {
+.heroActions .primaryLinkButton,
+.heroActions .themeControl {
   align-self: center;
   min-height: 44px;
-  padding-inline: 18px;
   white-space: nowrap;
+}
+
+.heroActions .ghostButton,
+.heroActions .primaryLinkButton {
+  padding-inline: 18px;
 }
 
 .heroActions .identityCard {
@@ -1025,6 +1078,11 @@ h3 {
     flex-basis: auto;
   }
 
+  .themeControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .imagePickerGrid {
     grid-template-columns: 1fr;
   }
@@ -1033,5 +1091,14 @@ h3 {
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  .authTopRow {
+    display: none;
+  }
+
+  .authTopRowMobileOnly {
+    display: flex;
+    justify-content: flex-end;
   }
 }

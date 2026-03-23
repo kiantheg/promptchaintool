@@ -11,13 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import { missingSupabaseMessage, supabase } from "@/lib/supabase-browser";
+import { ThemeModeControl } from "@/components/prompt-chain/theme-mode-control";
 import {
   type HumorFlavor,
   type Profile,
   getMyProfile,
   listHumorFlavors,
 } from "@/lib/supabase-rest";
-import { type ThemeMode } from "@/components/prompt-chain/shared";
 
 type WorkspaceContextValue = {
   token: string;
@@ -53,8 +53,6 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
   const [token, setToken] = useState<string | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
   const [authorized, setAuthorized] = useState(false);
-
-  const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [flavors, setFlavors] = useState<HumorFlavor[]>([]);
   const [flavorFilter, setFlavorFilter] = useState("");
 
@@ -73,32 +71,6 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
       );
     });
   }, [flavorFilter, flavors]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const stored = window.localStorage.getItem("prompt-chain-theme");
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      setThemeMode(stored);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const root = document.documentElement;
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const applyTheme = () => {
-      const resolved = themeMode === "system" ? (mediaQuery.matches ? "dark" : "light") : themeMode;
-      root.dataset.theme = resolved;
-      window.localStorage.setItem("prompt-chain-theme", themeMode);
-    };
-
-    applyTheme();
-    mediaQuery.addEventListener("change", applyTheme);
-    return () => mediaQuery.removeEventListener("change", applyTheme);
-  }, [themeMode]);
 
   const refreshFlavors = async () => {
     if (!token) return [];
@@ -238,16 +210,6 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                   value={flavorFilter}
                   onChange={(event) => setFlavorFilter(event.target.value)}
                 />
-                <select
-                  className="themeSelect"
-                  value={themeMode}
-                  onChange={(event) => setThemeMode(event.target.value as ThemeMode)}
-                  aria-label="Theme"
-                >
-                  <option value="system">System</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
               </div>
 
               <div className="flavorList flavorListCompact">
@@ -291,6 +253,7 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                 <Link href="/flavors/new" className="primaryButton primaryLinkButton">
                   + New flavor
                 </Link>
+                <ThemeModeControl />
                 <div className="identityCard">
                   <span>{me.is_superadmin ? "Superadmin" : "Matrix admin"}</span>
                   <strong>{me.first_name || me.email || me.id}</strong>

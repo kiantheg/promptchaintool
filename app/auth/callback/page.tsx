@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ThemeModeControl } from "@/components/prompt-chain/theme-mode-control";
 import { missingSupabaseMessage, supabase } from "@/lib/supabase-browser";
 
 export default function AuthCallbackPage() {
@@ -65,6 +66,10 @@ export default function AuthCallbackPage() {
     <main className="shell authShell">
       <div className="authLayout authLayoutCompact">
         <section className="authPanel authActionPanel">
+          <div className="authTopRow">
+            <div />
+            <ThemeModeControl compact />
+          </div>
           <p className="eyebrow">Prompt Chain Tool</p>
           <h2>Finishing sign-in</h2>
           <p className="muted sectionNote">{message}</p>

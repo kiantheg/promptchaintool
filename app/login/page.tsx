@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ThemeModeControl } from "@/components/prompt-chain/theme-mode-control";
 import { missingSupabaseMessage, supabase } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
@@ -54,6 +55,10 @@ export default function LoginPage() {
     <main className="shell authShell">
       <div className="authLayout">
         <section className="authPanel authBrandPanel">
+          <div className="authTopRow">
+            <div />
+            <ThemeModeControl compact />
+          </div>
           <p className="eyebrow">Prompt Chain Tool</p>
           <h1>Humor flavor workspace</h1>
           <p className="muted sectionNote">
@@ -79,6 +84,9 @@ export default function LoginPage() {
         </section>
 
         <section className="authPanel authActionPanel">
+          <div className="authTopRow authTopRowMobileOnly">
+            <ThemeModeControl compact />
+          </div>
           <p className="eyebrow">Admin Access</p>
           <h2>Sign in with Google</h2>
           <p className="muted sectionNote">
