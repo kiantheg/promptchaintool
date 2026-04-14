@@ -20,7 +20,7 @@ import {
   listHumorFlavors,
 } from "@/lib/supabase-rest";
 
-/* ===== TOAST ===== */
+/* ===== TOAST CONTEXT ===== */
 type ToastType = "success" | "error";
 type ToastItem = { id: string; message: string; type: ToastType; exiting: boolean };
 
@@ -88,7 +88,7 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
       setTimeout(() => {
         setToasts((current) => current.filter((t) => t.id !== id));
       }, 220);
-    }, 3200);
+    }, 3400);
   }, []);
 
   const selectedFlavor = useMemo(
@@ -99,12 +99,11 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
   const filteredFlavors = useMemo(() => {
     const query = flavorFilter.trim().toLowerCase();
     if (!query) return flavors;
-    return flavors.filter((flavor) => {
-      return (
+    return flavors.filter(
+      (flavor) =>
         flavor.slug.toLowerCase().includes(query) ||
-        (flavor.description ?? "").toLowerCase().includes(query)
-      );
-    });
+        (flavor.description ?? "").toLowerCase().includes(query),
+    );
   }, [flavorFilter, flavors]);
 
   const refreshFlavors = async () => {
@@ -171,13 +170,11 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
 
   const signOut = async () => {
     const client = supabase;
-    if (client) {
-      await client.auth.signOut();
-    }
+    if (client) await client.auth.signOut();
     window.location.replace("/login");
   };
 
-  /* Toast container is always rendered */
+  /* Toast container — always visible */
   const toastContainer = (
     <div className="toastContainer">
       {toasts.map((toast) => (
@@ -185,22 +182,25 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
           key={toast.id}
           className={`toast ${toast.type === "success" ? "toastSuccess" : "toastError"}${toast.exiting ? " toastExiting" : ""}`}
         >
-          {toast.type === "success" ? "✓ " : "✕ "}
+          {toast.type === "success" ? "✓  " : "✕  "}
           {toast.message}
         </div>
       ))}
     </div>
   );
 
+  /* Loading / error states */
   if (loading) {
     return (
       <>
         {toastContainer}
-        <main className="shell">
-          <section className="loadingPanel panel">
+        <main className="adminGate">
+          <section className="gateCard">
             <p className="eyebrow">Prompt Chain Tool</p>
             <h1>{status}</h1>
-            <p className="muted">Pulling your session, admin flags, and prompt-chain workspace.</p>
+            <p className="supporting">
+              Checking your session, admin flags, and prompt-chain workspace.
+            </p>
           </section>
         </main>
       </>
@@ -211,23 +211,28 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
     return (
       <>
         {toastContainer}
-        <main className="shell">
-          <section className="loadingPanel panel">
+        <main className="adminGate">
+          <section className="gateCard">
             <p className="eyebrow">Access Control</p>
             <h1>Admin access required</h1>
-            <p className="muted">
-              This page only works when <code>profiles.is_superadmin = true</code> or{" "}
+            <p className="supporting">
+              This page requires <code>profiles.is_superadmin = true</code> or{" "}
               <code>profiles.is_matrix_admin = true</code>.
             </p>
             {me && (
-              <p className="muted">
+              <p className="supporting">
                 Signed in as {me.email ?? me.id}
                 {me.is_superadmin ? " · superadmin" : ""}
                 {me.is_matrix_admin ? " · matrix admin" : ""}
               </p>
             )}
-            {error && <p className="errorBanner">{error}</p>}
-            <button type="button" className="ghostButton" onClick={signOut}>
+            {error && <p className="errorBanner" style={{ marginTop: "1rem" }}>{error}</p>}
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={() => void signOut()}
+              style={{ marginTop: "1rem" }}
+            >
               Sign out
             </button>
           </section>
@@ -236,54 +241,56 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
     );
   }
 
-  /* User initials for avatar */
+  /* User display */
   const userInitial = (me.first_name?.charAt(0) || me.email?.charAt(0) || "A").toUpperCase();
   const userDisplayName = me.first_name || me.email || me.id;
   const userRole = me.is_superadmin ? "Superadmin" : "Matrix Admin";
 
   return (
     <ToastContext.Provider value={{ showToast }}>
-      <WorkspaceContext.Provider value={{ token, me, flavors, selectedFlavor, refreshFlavors, showToast }}>
+      <WorkspaceContext.Provider
+        value={{ token, me, flavors, selectedFlavor, refreshFlavors, showToast }}
+      >
         {toastContainer}
-        <main className="shell">
-          <div className="appFrame">
-            {/* ─── Sidebar ─── */}
-            <aside className="sidebar">
-              {/* Brand */}
-              <Link href="/" className="sidebarBrand">
+
+        {/* ── Full-bleed layout (matches adminApp) ── */}
+        <div className="adminApp">
+
+          {/* ── Dark sidebar ── */}
+          <aside className="sidebar">
+
+            {/* Brand */}
+            <div className="sidebarBrand">
+              <Link href="/" style={{ textDecoration: "none" }}>
                 <span className="sidebarBrandEyebrow">Prompt Chain Tool</span>
                 <p className="sidebarBrandName">Humor Flavor Workspace</p>
                 <p className="sidebarBrandDesc">
-                  Pick a flavor to edit its chain, run test generations, and view history.
+                  Pick a flavor to edit its chain, run generations, and inspect history.
                 </p>
               </Link>
+            </div>
 
+            {/* Scrollable middle */}
+            <div className="sidebarScroll">
               {/* Flavor rail */}
-              <section className="panel compactPanel railSection flavorRail">
-                <div className="panelHeader panelHeaderTight">
-                  <div>
-                    <h2>Flavors</h2>
-                    <p className="muted sectionNote" style={{ fontSize: 12 }}>
-                      Select a flavor to open its workspace.
-                    </p>
-                  </div>
-                  <span className="pill">{flavors.length}</span>
+              <div className="flavorRail">
+                <div className="flavorRailHeader">
+                  <span className="flavorRailLabel">Flavors</span>
+                  <span className="flavorRailCount">{flavors.length}</span>
                 </div>
 
-                <div className="toolbarRow toolbarRowCompact">
-                  <input
-                    className="searchInput"
-                    placeholder="Filter flavors..."
-                    value={flavorFilter}
-                    onChange={(event) => setFlavorFilter(event.target.value)}
-                  />
-                </div>
+                <input
+                  className="searchInput"
+                  placeholder="Filter flavors…"
+                  value={flavorFilter}
+                  onChange={(e) => setFlavorFilter(e.target.value)}
+                />
 
-                <div className="flavorList flavorListCompact">
+                <div className="flavorListCompact">
                   {filteredFlavors.map((flavor) => {
                     const href = `/flavors/${flavor.id}`;
-                    const isActive = pathname === href || pathname.startsWith(`${href}/`);
-
+                    const isActive =
+                      pathname === href || pathname.startsWith(`${href}/`);
                     return (
                       <Link
                         key={flavor.id}
@@ -292,7 +299,7 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                       >
                         <div className="flavorCardTop">
                           <span className="flavorSlug">{flavor.slug}</span>
-                          <span className="flavorMeta" style={{ fontSize: 11 }}>#{flavor.id}</span>
+                          <span className="flavorMeta">#{flavor.id}</span>
                         </div>
                         <span className="flavorDescription">
                           {flavor.description || "No description yet."}
@@ -301,60 +308,58 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                     );
                   })}
                   {filteredFlavors.length === 0 && (
-                    <p className="muted emptyNotice" style={{ fontSize: 13 }}>
+                    <p style={{ fontSize: "0.78rem", color: "var(--sidebar-muted)", padding: "0.65rem 0.9rem" }}>
                       No flavors match this filter.
                     </p>
                   )}
                 </div>
-              </section>
+              </div>
+            </div>
 
-              {/* User identity */}
-              <div className="sidebarUser">
-                <div className="sidebarUserInfo">
-                  <div className="sidebarUserAvatar">{userInitial}</div>
-                  <div className="sidebarUserDetails">
-                    <span className="sidebarUserName">{userDisplayName}</span>
-                    <span className="sidebarUserRole">{userRole}</span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <ThemeModeControl compact />
-                  <button
-                    type="button"
-                    className="ghostButton"
-                    onClick={signOut}
-                    style={{ flex: 1, fontSize: 13, padding: "8px 12px" }}
-                  >
-                    Sign out
-                  </button>
+            {/* Footer: identity + theme + sign out */}
+            <div className="sidebarFooter">
+              <div className="sidebarFooterRow">
+                <div className="sidebarUserAvatar">{userInitial}</div>
+                <div className="sidebarUserDetails">
+                  <span className="sidebarUserName">{userDisplayName}</span>
+                  <span className="sidebarUserRole">{userRole}</span>
                 </div>
               </div>
-            </aside>
+              <ThemeModeControl compact />
+              <button
+                type="button"
+                className="sidebarSignOutButton"
+                onClick={() => void signOut()}
+              >
+                Sign out
+              </button>
+            </div>
+          </aside>
 
-            {/* ─── Main stage ─── */}
-            <section className="mainStage">
-              {/* Header / Hero */}
-              <header className="panel" style={{ padding: "18px 24px" }}>
-                <div className="heroV2">
-                  <div className="heroV2Title">
-                    <p className="eyebrow" style={{ marginBottom: 4 }}>
-                      {selectedFlavor ? "Flavor workspace" : "Dashboard"}
-                    </p>
-                    <h2 style={{ marginBottom: 0 }}>
-                      {selectedFlavor ? selectedFlavor.slug : "Humor Flavors"}
-                    </h2>
-                  </div>
-                  <div className="heroV2Actions">
-                    <Link href="/flavors/new" className="primaryButton primaryLinkButton">
-                      + New flavor
-                    </Link>
-                  </div>
+          {/* ── Content shell ── */}
+          <div className="contentShell">
+            <div className="pageContent">
+
+              {/* Page header */}
+              <header className="pageHeader">
+                <div className="pageHeaderTitle">
+                  <p className="eyebrow" style={{ color: "var(--muted)", marginBottom: "0.2rem" }}>
+                    {selectedFlavor ? "Flavor workspace" : "Dashboard"}
+                  </p>
+                  <h1 style={{ marginBottom: 0 }}>
+                    {selectedFlavor ? selectedFlavor.slug : "Humor Flavors"}
+                  </h1>
+                </div>
+                <div className="pageHeaderActions">
+                  <Link href="/flavors/new" className="primaryButton">
+                    + New flavor
+                  </Link>
                 </div>
               </header>
 
               {/* Flavor tab nav */}
               {selectedFlavor && (
-                <nav className="panel flavorNav2">
+                <nav className="flavorNav2">
                   <span className="navFlavorLabel">{selectedFlavor.slug}</span>
                   <span className="navDivider">›</span>
                   <Link
@@ -390,11 +395,15 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                 </nav>
               )}
 
-              {error && <p className="errorBanner">{error}</p>}
+              {error && (
+                <p className="errorBanner">{error}</p>
+              )}
+
               {children}
-            </section>
+            </div>
           </div>
-        </main>
+
+        </div>
       </WorkspaceContext.Provider>
     </ToastContext.Provider>
   );
