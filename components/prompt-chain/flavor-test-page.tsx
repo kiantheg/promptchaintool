@@ -11,11 +11,9 @@ import {
 } from "@/lib/supabase-rest";
 
 function FlavorTestContent() {
-  const { token, selectedFlavor } = usePromptChainWorkspace();
+  const { token, selectedFlavor, showToast } = usePromptChainWorkspace();
 
-  const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const [testMessage, setTestMessage] = useState<string | null>(null);
   const [generatedCaptions, setGeneratedCaptions] = useState<string[]>([]);
   const [imageOptions, setImageOptions] = useState<ImageOption[]>([]);
   const [imageQuery, setImageQuery] = useState("");
@@ -23,18 +21,20 @@ function FlavorTestContent() {
 
   useEffect(() => {
     const load = async () => {
-      setError(null);
       try {
         const images = await listImageOptions(token, 1, 60);
         setImageOptions(images);
         setSelectedImageId((current) => current || images[0]?.id || "");
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load public images.");
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Unable to load public images.",
+          "error",
+        );
       }
     };
 
     void load();
-  }, [token]);
+  }, [token, showToast]);
 
   const filteredImages = useMemo(() => {
     const query = imageQuery.trim().toLowerCase();
@@ -63,21 +63,20 @@ function FlavorTestContent() {
 
   const handleGenerate = async () => {
     if (!selectedImageId) return;
-
     setTesting(true);
-    setError(null);
-    setTestMessage("Generating captions...");
+    setGeneratedCaptions([]);
     try {
       const rows = await generateCaptions(token, selectedImageId, selectedFlavor.id);
-      setGeneratedCaptions(getGeneratedLines(rows));
-      setTestMessage(`Generated ${rows.length} rows for flavor ${selectedFlavor.slug}.`);
-    } catch (generationError) {
-      setError(
-        generationError instanceof Error
-          ? generationError.message
+      const captions = getGeneratedLines(rows);
+      setGeneratedCaptions(captions);
+      showToast(`Generated ${captions.length} caption(s) for ${selectedFlavor.slug}.`);
+    } catch (err) {
+      showToast(
+        err instanceof Error
+          ? err.message
           : "Unable to generate captions for this flavor.",
+        "error",
       );
-      setTestMessage(null);
     } finally {
       setTesting(false);
     }
@@ -85,19 +84,21 @@ function FlavorTestContent() {
 
   return (
     <>
-      {error && <p className="errorBanner">{error}</p>}
       <div className="gridTwo gridTwoTop">
+        {/* Image picker */}
         <section className="panel">
           <div className="panelHeader">
             <div>
-              <h2>Test setup</h2>
-              <p className="muted sectionNote">Choose a public image visually before running the flavor.</p>
+              <h2>Select an image</h2>
+              <p className="muted sectionNote">
+                Choose a public image visually before running the flavor.
+              </p>
             </div>
             <span className="panelTag">{filteredImages.length} images</span>
           </div>
           <input
             className="searchInput"
-            placeholder="Search by image description or ID..."
+            placeholder="Search by description or ID..."
             value={imageQuery}
             onChange={(event) => setImageQuery(event.target.value)}
           />
@@ -111,7 +112,11 @@ function FlavorTestContent() {
                   <button
                     key={image.id}
                     type="button"
-                    className={image.id === selectedImageId ? "imageTile imageTileActive" : "imageTile"}
+                    className={
+                      image.id === selectedImageId
+                        ? "imageTile imageTileActive"
+                        : "imageTile"
+                    }
                     onClick={() => setSelectedImageId(image.id)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -124,11 +129,14 @@ function FlavorTestContent() {
           </div>
         </section>
 
+        {/* Preview + generate */}
         <section className="panel">
           <div className="panelHeader">
             <div>
-              <h2>Image preview</h2>
-              <p className="muted sectionNote">Review the selected image and run the live generation flow.</p>
+              <h2>Preview &amp; generate</h2>
+              <p className="muted sectionNote">
+                Review the selected image and run the live generation flow.
+              </p>
             </div>
             <span className="panelTag">Flavor #{selectedFlavor.id}</span>
           </div>
@@ -142,8 +150,8 @@ function FlavorTestContent() {
                 />
                 <div className="testPreviewMeta">
                   <h3>{selectedImage.image_description || "Selected test image"}</h3>
-                  <p className="muted">{selectedImage.id}</p>
-                  <p className="muted">
+                  <p className="muted" style={{ fontSize: 13 }}>{selectedImage.id}</p>
+                  <p className="muted" style={{ fontSize: 13 }}>
                     {selectedImage.is_common_use ? "Common-use image" : "Public image"} · added{" "}
                     {relativeDate(selectedImage.created_datetime_utc)}
                   </p>
@@ -152,24 +160,28 @@ function FlavorTestContent() {
               <button
                 type="button"
                 className="primaryButton"
-                onClick={handleGenerate}
+                onClick={() => void handleGenerate()}
                 disabled={testing}
               >
-                {testing ? "Generating..." : `Generate captions for ${selectedFlavor.slug}`}
+                {testing
+                  ? "Generating..."
+                  : `Generate captions for ${selectedFlavor.slug}`}
               </button>
             </>
           ) : (
-            <p className="muted emptyNotice">Select an image from the left to preview it here.</p>
+            <p className="emptyNotice">Select an image from the left to preview it here.</p>
           )}
-          {testMessage && <p className="successBanner">{testMessage}</p>}
         </section>
       </div>
 
+      {/* Generated captions */}
       <section className="panel">
         <div className="panelHeader">
           <div>
             <h2>Generated captions</h2>
-            <p className="muted sectionNote">This page only shows the latest generation result.</p>
+            <p className="muted sectionNote">
+              Showing the latest generation result for this flavor.
+            </p>
           </div>
           <span className="panelTag">{generatedCaptions.length} captions</span>
         </div>
@@ -181,7 +193,9 @@ function FlavorTestContent() {
             </article>
           ))}
           {generatedCaptions.length === 0 && (
-            <p className="muted emptyNotice">Run a test to preview the API output for this flavor.</p>
+            <p className="emptyNotice">
+              Run a test to preview the API output for this flavor.
+            </p>
           )}
         </div>
       </section>

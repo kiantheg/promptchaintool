@@ -11,9 +11,8 @@ import {
 } from "@/lib/supabase-rest";
 
 function FlavorHistoryContent() {
-  const { token, selectedFlavor } = usePromptChainWorkspace();
+  const { token, selectedFlavor, showToast } = usePromptChainWorkspace();
 
-  const [error, setError] = useState<string | null>(null);
   const [captionHistory, setCaptionHistory] = useState<CaptionHistoryRow[]>([]);
   const [responseHistory, setResponseHistory] = useState<LlmResponseRow[]>([]);
 
@@ -21,7 +20,6 @@ function FlavorHistoryContent() {
     if (!selectedFlavor) return;
 
     const load = async () => {
-      setError(null);
       try {
         const [captionRows, responseRows] = await Promise.all([
           listFlavorCaptions(token, selectedFlavor.id),
@@ -29,13 +27,16 @@ function FlavorHistoryContent() {
         ]);
         setCaptionHistory(captionRows);
         setResponseHistory(responseRows);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load flavor history.");
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Unable to load flavor history.",
+          "error",
+        );
       }
     };
 
     void load();
-  }, [selectedFlavor, token]);
+  }, [selectedFlavor, token, showToast]);
 
   if (!selectedFlavor) {
     return (
@@ -48,8 +49,8 @@ function FlavorHistoryContent() {
 
   return (
     <>
-      {error && <p className="errorBanner">{error}</p>}
-      <div className="statsStrip">
+      {/* Stats */}
+      <div className="statsStrip statsStripCompact">
         <article className="statCard">
           <span>Saved captions</span>
           <strong>{captionHistory.length}</strong>
@@ -65,11 +66,14 @@ function FlavorHistoryContent() {
       </div>
 
       <div className="gridTwo">
+        {/* Caption history */}
         <section className="panel">
           <div className="panelHeader">
             <div>
               <h2>Caption history</h2>
-              <p className="muted sectionNote">Most recent saved captions generated with this flavor.</p>
+              <p className="muted sectionNote">
+                Most recent saved captions generated with this flavor.
+              </p>
             </div>
             <span className="panelTag">{captionHistory.length} rows</span>
           </div>
@@ -80,7 +84,9 @@ function FlavorHistoryContent() {
                   <span>{relativeDate(caption.created_datetime_utc)}</span>
                   <span>request #{caption.caption_request_id ?? "?"}</span>
                 </div>
-                <p>{caption.content || "Empty caption row."}</p>
+                <p style={{ marginTop: 10, lineHeight: 1.55 }}>
+                  {caption.content || <em style={{ color: "var(--muted)" }}>Empty caption row.</em>}
+                </p>
                 <div className="historyFooter">
                   <span>{caption.image_id.slice(0, 8)}</span>
                   <span>{formatDate(caption.created_datetime_utc)}</span>
@@ -88,16 +94,19 @@ function FlavorHistoryContent() {
               </article>
             ))}
             {captionHistory.length === 0 && (
-              <p className="muted emptyNotice">No saved captions yet for this flavor.</p>
+              <p className="emptyNotice">No saved captions yet for this flavor.</p>
             )}
           </div>
         </section>
 
+        {/* Model response log */}
         <section className="panel">
           <div className="panelHeader">
             <div>
               <h2>Model response log</h2>
-              <p className="muted sectionNote">Raw step outputs from the caption generation pipeline.</p>
+              <p className="muted sectionNote">
+                Raw step outputs from the caption generation pipeline.
+              </p>
             </div>
             <span className="panelTag">{responseHistory.length} rows</span>
           </div>
@@ -106,9 +115,15 @@ function FlavorHistoryContent() {
               <article key={response.id} className="historyCard">
                 <div className="historyTop">
                   <span>step #{response.humor_flavor_step_id ?? "?"}</span>
-                  <span>{response.processing_time_seconds ?? "?"}s</span>
+                  <span>
+                    {response.processing_time_seconds !== null
+                      ? `${response.processing_time_seconds}s`
+                      : "?s"}
+                  </span>
                 </div>
-                <pre>{response.llm_model_response || "No response body."}</pre>
+                <pre style={{ marginTop: 10 }}>
+                  {response.llm_model_response || "No response body."}
+                </pre>
                 <div className="historyFooter">
                   <span>request #{response.caption_request_id}</span>
                   <span>{formatDate(response.created_datetime_utc)}</span>
@@ -116,7 +131,7 @@ function FlavorHistoryContent() {
               </article>
             ))}
             {responseHistory.length === 0 && (
-              <p className="muted emptyNotice">No LLM response rows yet for this flavor.</p>
+              <p className="emptyNotice">No LLM response rows yet for this flavor.</p>
             )}
           </div>
         </section>
