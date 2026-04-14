@@ -12,10 +12,12 @@ import {
   type StepFormState,
 } from "@/components/prompt-chain/shared";
 import { PromptChainShell, usePromptChainWorkspace } from "@/components/prompt-chain/workspace-shell";
+import { Modal, ConfirmModal } from "@/components/prompt-chain/modal";
 import {
   type HumorFlavorStep,
   type LlmModel,
   type LookupRow,
+  createHumorFlavor,
   createHumorFlavorStep,
   deleteHumorFlavor,
   deleteHumorFlavorStep,
@@ -26,25 +28,285 @@ import {
   updateHumorFlavorStep,
 } from "@/lib/supabase-rest";
 
+/* ─── Step form fields ─── */
+function StepFormFields({
+  form,
+  onChange,
+  llmModels,
+  inputTypes,
+  outputTypes,
+  stepTypes,
+}: {
+  form: StepFormState;
+  onChange: (update: Partial<StepFormState>) => void;
+  llmModels: LlmModel[];
+  inputTypes: LookupRow[];
+  outputTypes: LookupRow[];
+  stepTypes: LookupRow[];
+}) {
+  return (
+    <div className="stackForm">
+      <div className="fieldGrid">
+        <label className="field">
+          <span>Description</span>
+          <input
+            value={form.description}
+            onChange={(e) => onChange({ description: e.target.value })}
+            placeholder="Step title"
+          />
+        </label>
+        <label className="field">
+          <span>Temperature</span>
+          <input
+            value={form.llm_temperature}
+            onChange={(e) => onChange({ llm_temperature: e.target.value })}
+            placeholder="Optional (e.g. 0.7)"
+          />
+        </label>
+      </div>
+      <div className="fieldGrid">
+        <label className="field">
+          <span>Model</span>
+          <select
+            value={form.llm_model_id}
+            onChange={(e) => onChange({ llm_model_id: e.target.value })}
+            required
+          >
+            <option value="">Select a model</option>
+            {llmModels.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Step type</span>
+          <select
+            value={form.humor_flavor_step_type_id}
+            onChange={(e) => onChange({ humor_flavor_step_type_id: e.target.value })}
+            required
+          >
+            <option value="">Select a step type</option>
+            {stepTypes.map((r) => (
+              <option key={r.id} value={r.id}>{getLookupLabel(r)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Input type</span>
+          <select
+            value={form.llm_input_type_id}
+            onChange={(e) => onChange({ llm_input_type_id: e.target.value })}
+            required
+          >
+            <option value="">Select input type</option>
+            {inputTypes.map((r) => (
+              <option key={r.id} value={r.id}>{getLookupLabel(r)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Output type</span>
+          <select
+            value={form.llm_output_type_id}
+            onChange={(e) => onChange({ llm_output_type_id: e.target.value })}
+            required
+          >
+            <option value="">Select output type</option>
+            {outputTypes.map((r) => (
+              <option key={r.id} value={r.id}>{getLookupLabel(r)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        <span>System prompt</span>
+        <textarea
+          rows={7}
+          value={form.llm_system_prompt}
+          onChange={(e) => onChange({ llm_system_prompt: e.target.value })}
+          placeholder="Instructions that set the model's role and behavior..."
+        />
+      </label>
+      <label className="field">
+        <span>User prompt</span>
+        <textarea
+          rows={9}
+          value={form.llm_user_prompt}
+          onChange={(e) => onChange({ llm_user_prompt: e.target.value })}
+          placeholder="The actual request sent to the model..."
+        />
+      </label>
+    </div>
+  );
+}
+
+/* ─── Single step card ─── */
+function StepCard({
+  step,
+  index,
+  total,
+  llmModels,
+  inputTypes,
+  outputTypes,
+  stepTypes,
+  saving,
+  onEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: {
+  step: HumorFlavorStep;
+  index: number;
+  total: number;
+  llmModels: LlmModel[];
+  inputTypes: LookupRow[];
+  outputTypes: LookupRow[];
+  stepTypes: LookupRow[];
+  saving: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const model = llmModels.find((r) => r.id === step.llm_model_id);
+  const inputType = inputTypes.find((r) => r.id === step.llm_input_type_id);
+  const outputType = outputTypes.find((r) => r.id === step.llm_output_type_id);
+  const stepType = stepTypes.find((r) => r.id === step.humor_flavor_step_type_id);
+
+  return (
+    <article className="stepCardV2">
+      {/* Header row */}
+      <div className="stepCardHeader">
+        <div className="stepBadge">{index + 1}</div>
+        <div className="stepCardTitle">
+          <div className="stepCardName">{step.description || "Untitled step"}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+            Step {index + 1} of {total}
+          </div>
+        </div>
+        <div className="stepCardActions">
+          <button
+            type="button"
+            className="iconButton"
+            title="Move up"
+            disabled={index === 0 || saving}
+            onClick={onMoveUp}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="iconButton"
+            title="Move down"
+            disabled={index === total - 1 || saving}
+            onClick={onMoveDown}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="iconButton"
+            title="Edit step"
+            onClick={onEdit}
+          >
+            ✎
+          </button>
+          <button
+            type="button"
+            className="iconButton iconButtonDanger"
+            title="Delete step"
+            disabled={saving}
+            onClick={onDelete}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="stepCardBody">
+        {/* Meta chips */}
+        <div className="stepMetaChips">
+          <span className="stepMetaChip">
+            <span className="stepMetaChipLabel">Type</span>
+            <span className="stepMetaChipValue">{getLookupLabel(stepType)}</span>
+          </span>
+          <span className="stepMetaChip">
+            <span className="stepMetaChipLabel">Model</span>
+            <span className="stepMetaChipValue">{model?.name || `#${step.llm_model_id}`}</span>
+          </span>
+          <span className="stepMetaChip">
+            <span className="stepMetaChipLabel">In</span>
+            <span className="stepMetaChipValue">{getLookupLabel(inputType)}</span>
+          </span>
+          <span className="stepMetaChip">
+            <span className="stepMetaChipLabel">Out</span>
+            <span className="stepMetaChipValue">{getLookupLabel(outputType)}</span>
+          </span>
+          {step.llm_temperature !== null && (
+            <span className="stepMetaChip">
+              <span className="stepMetaChipLabel">Temp</span>
+              <span className="stepMetaChipValue">{step.llm_temperature}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Prompt display */}
+        <div className="promptGrid">
+          <div className="promptBlock">
+            <span className="promptDisplayLabel">System prompt</span>
+            <pre className="promptDisplayText">
+              {step.llm_system_prompt || <em style={{ color: "var(--muted)" }}>No system prompt.</em>}
+            </pre>
+          </div>
+          <div className="promptBlock">
+            <span className="promptDisplayLabel">User prompt</span>
+            <pre className="promptDisplayText">
+              {step.llm_user_prompt || <em style={{ color: "var(--muted)" }}>No user prompt.</em>}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* ─── Main editor content ─── */
 function FlavorEditorContent() {
   const router = useRouter();
-  const { token, me, selectedFlavor, refreshFlavors } = usePromptChainWorkspace();
+  const { token, me, selectedFlavor, refreshFlavors, showToast } = usePromptChainWorkspace();
 
-  const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<HumorFlavorStep[]>([]);
   const [llmModels, setLlmModels] = useState<LlmModel[]>([]);
   const [inputTypes, setInputTypes] = useState<LookupRow[]>([]);
   const [outputTypes, setOutputTypes] = useState<LookupRow[]>([]);
   const [stepTypes, setStepTypes] = useState<LookupRow[]>([]);
+
   const [flavorSaving, setFlavorSaving] = useState(false);
   const [stepSaving, setStepSaving] = useState(false);
-  const [stepEditingId, setStepEditingId] = useState<number | null>(null);
-  const [editFlavorForm, setEditFlavorForm] = useState<FlavorFormState>({
-    slug: "",
-    description: "",
+
+  const [editFlavorForm, setEditFlavorForm] = useState<FlavorFormState>({ slug: "", description: "" });
+
+  /* Modal state */
+  const [editStepModal, setEditStepModal] = useState<{ open: boolean; stepId: number | null }>({
+    open: false,
+    stepId: null,
   });
-  const [createStepForm, setCreateStepForm] = useState<StepFormState>(EMPTY_STEP_FORM);
   const [editStepForm, setEditStepForm] = useState<StepFormState>(EMPTY_STEP_FORM);
+
+  const [createStepModal, setCreateStepModal] = useState(false);
+  const [createStepForm, setCreateStepForm] = useState<StepFormState>(EMPTY_STEP_FORM);
+
+  const [deleteStepModal, setDeleteStepModal] = useState<{ open: boolean; stepId: number | null }>({
+    open: false,
+    stepId: null,
+  });
+
+  const [deleteFlavorModal, setDeleteFlavorModal] = useState(false);
+
+  const [duplicateModal, setDuplicateModal] = useState(false);
+  const [duplicateSlug, setDuplicateSlug] = useState("");
+  const [duplicateSaving, setDuplicateSaving] = useState(false);
 
   useEffect(() => {
     if (!selectedFlavor) return;
@@ -53,9 +315,7 @@ function FlavorEditorContent() {
 
   useEffect(() => {
     if (!selectedFlavor) return;
-
     const load = async () => {
-      setError(null);
       try {
         const [stepRows, modelRows, inputRows, outputRows, stepTypeRows] = await Promise.all([
           listHumorFlavorSteps(token, selectedFlavor.id),
@@ -69,13 +329,12 @@ function FlavorEditorContent() {
         setInputTypes(inputRows);
         setOutputTypes(outputRows);
         setStepTypes(stepTypeRows);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load flavor details.");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Unable to load flavor details.", "error");
       }
     };
-
     void load();
-  }, [selectedFlavor, token]);
+  }, [selectedFlavor, token, showToast]);
 
   if (!selectedFlavor) {
     return (
@@ -90,46 +349,83 @@ function FlavorEditorContent() {
     setSteps(await listHumorFlavorSteps(token, selectedFlavor.id));
   };
 
+  /* ── Flavor update ── */
   const handleUpdateFlavor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFlavorSaving(true);
-    setError(null);
     try {
       await updateHumorFlavor(token, me.id, selectedFlavor.id, {
         slug: editFlavorForm.slug.trim(),
         description: editFlavorForm.description.trim() || null,
       });
       await refreshFlavors();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update flavor.");
+      showToast("Flavor updated successfully.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update flavor.", "error");
     } finally {
       setFlavorSaving(false);
     }
   };
 
+  /* ── Flavor delete ── */
   const handleDeleteFlavor = async () => {
-    const confirmed = window.confirm(
-      `Delete flavor "${selectedFlavor.slug}"? This will fail if dependent rows still exist.`,
-    );
-    if (!confirmed) return;
-
     setFlavorSaving(true);
-    setError(null);
     try {
       await deleteHumorFlavor(token, selectedFlavor.id);
       await refreshFlavors();
+      setDeleteFlavorModal(false);
+      showToast("Flavor deleted.");
       router.push("/");
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete flavor.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to delete flavor.", "error");
     } finally {
       setFlavorSaving(false);
     }
   };
 
-  const handleCreateStep = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  /* ── Flavor duplicate ── */
+  const handleDuplicate = async () => {
+    const slug = duplicateSlug.trim();
+    if (!slug) return;
+    setDuplicateSaving(true);
+    try {
+      const created = await createHumorFlavor(token, me.id, {
+        slug,
+        description: selectedFlavor.description,
+      });
+      const newFlavor = created[0];
+      if (newFlavor) {
+        /* Copy all steps */
+        for (const step of steps) {
+          await createHumorFlavorStep(token, me.id, {
+            humor_flavor_id: newFlavor.id,
+            order_by: step.order_by,
+            description: step.description,
+            llm_system_prompt: step.llm_system_prompt,
+            llm_user_prompt: step.llm_user_prompt,
+            llm_temperature: step.llm_temperature,
+            llm_model_id: step.llm_model_id,
+            llm_input_type_id: step.llm_input_type_id,
+            llm_output_type_id: step.llm_output_type_id,
+            humor_flavor_step_type_id: step.humor_flavor_step_type_id,
+          });
+        }
+        await refreshFlavors();
+        setDuplicateModal(false);
+        setDuplicateSlug("");
+        showToast(`Flavor duplicated as "${slug}".`);
+        router.push(`/flavors/${newFlavor.id}`);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to duplicate flavor.", "error");
+    } finally {
+      setDuplicateSaving(false);
+    }
+  };
+
+  /* ── Create step ── */
+  const handleCreateStep = async () => {
     setStepSaving(true);
-    setError(null);
     try {
       await createHumorFlavorStep(token, me.id, {
         humor_flavor_id: selectedFlavor.id,
@@ -146,19 +442,22 @@ function FlavorEditorContent() {
         humor_flavor_step_type_id: Number(createStepForm.humor_flavor_step_type_id),
       });
       setCreateStepForm(EMPTY_STEP_FORM);
+      setCreateStepModal(false);
       await reloadSteps();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create step.");
+      showToast("Step added to the chain.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to create step.", "error");
     } finally {
       setStepSaving(false);
     }
   };
 
-  const handleSaveStep = async (stepId: number) => {
+  /* ── Edit step ── */
+  const handleSaveStep = async () => {
+    if (!editStepModal.stepId) return;
     setStepSaving(true);
-    setError(null);
     try {
-      await updateHumorFlavorStep(token, me.id, stepId, {
+      await updateHumorFlavorStep(token, me.id, editStepModal.stepId, {
         description: editStepForm.description.trim() || null,
         llm_system_prompt: editStepForm.llm_system_prompt.trim() || null,
         llm_user_prompt: editStepForm.llm_user_prompt.trim() || null,
@@ -170,59 +469,55 @@ function FlavorEditorContent() {
         llm_output_type_id: Number(editStepForm.llm_output_type_id),
         humor_flavor_step_type_id: Number(editStepForm.humor_flavor_step_type_id),
       });
-      setStepEditingId(null);
+      setEditStepModal({ open: false, stepId: null });
       await reloadSteps();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update step.");
+      showToast("Step saved.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update step.", "error");
     } finally {
       setStepSaving(false);
     }
   };
 
-  const handleDeleteStep = async (stepId: number) => {
-    const confirmed = window.confirm("Delete this step?");
-    if (!confirmed) return;
-
+  /* ── Delete step ── */
+  const handleDeleteStep = async () => {
+    if (!deleteStepModal.stepId) return;
     setStepSaving(true);
-    setError(null);
     try {
-      await deleteHumorFlavorStep(token, stepId);
+      await deleteHumorFlavorStep(token, deleteStepModal.stepId);
       const remaining = await listHumorFlavorSteps(token, selectedFlavor.id);
-      for (const [index, step] of remaining.entries()) {
-        const desiredOrder = index + 1;
-        if (step.order_by !== desiredOrder) {
-          await updateHumorFlavorStep(token, me.id, step.id, { order_by: desiredOrder });
+      for (const [i, s] of remaining.entries()) {
+        if (s.order_by !== i + 1) {
+          await updateHumorFlavorStep(token, me.id, s.id, { order_by: i + 1 });
         }
       }
-      setStepEditingId(null);
+      setDeleteStepModal({ open: false, stepId: null });
       await reloadSteps();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete step.");
+      showToast("Step deleted.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to delete step.", "error");
     } finally {
       setStepSaving(false);
     }
   };
 
+  /* ── Move step ── */
   const handleMoveStep = async (stepId: number, direction: -1 | 1) => {
-    const currentIndex = steps.findIndex((step) => step.id === stepId);
+    const currentIndex = steps.findIndex((s) => s.id === stepId);
     if (currentIndex < 0) return;
-
     const nextIndex = currentIndex + direction;
     if (nextIndex < 0 || nextIndex >= steps.length) return;
-
-    const currentStep = steps[currentIndex];
-    const nextStep = steps[nextIndex];
-
+    const a = steps[currentIndex];
+    const b = steps[nextIndex];
     setStepSaving(true);
-    setError(null);
     try {
       await Promise.all([
-        updateHumorFlavorStep(token, me.id, currentStep.id, { order_by: nextStep.order_by }),
-        updateHumorFlavorStep(token, me.id, nextStep.id, { order_by: currentStep.order_by }),
+        updateHumorFlavorStep(token, me.id, a.id, { order_by: b.order_by }),
+        updateHumorFlavorStep(token, me.id, b.id, { order_by: a.order_by }),
       ]);
       await reloadSteps();
-    } catch (moveError) {
-      setError(moveError instanceof Error ? moveError.message : "Unable to reorder step.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to reorder step.", "error");
     } finally {
       setStepSaving(false);
     }
@@ -230,14 +525,14 @@ function FlavorEditorContent() {
 
   return (
     <>
-      {error && <p className="errorBanner">{error}</p>}
-      <div className="statsStrip">
+      {/* Stat strip */}
+      <div className="statsStrip statsStripCompact">
         <article className="statCard">
           <span>Flavor ID</span>
           <strong>{selectedFlavor.id}</strong>
         </article>
         <article className="statCard">
-          <span>Step count</span>
+          <span>Steps</span>
           <strong>{steps.length}</strong>
         </article>
         <article className="statCard">
@@ -246,6 +541,7 @@ function FlavorEditorContent() {
         </article>
       </div>
 
+      {/* Flavor details form + duplicate */}
       <div className="gridTwo gridTwoTop">
         <form className="panel" onSubmit={handleUpdateFlavor}>
           <div className="panelHeader">
@@ -253,22 +549,14 @@ function FlavorEditorContent() {
               <h2>Flavor details</h2>
               <p className="muted sectionNote">Edit the basic metadata for this humor flavor.</p>
             </div>
-            <button
-              type="button"
-              className="dangerButton"
-              onClick={handleDeleteFlavor}
-              disabled={flavorSaving}
-            >
-              Delete flavor
-            </button>
           </div>
           <div className="fieldGrid">
             <label className="field">
               <span>Slug</span>
               <input
                 value={editFlavorForm.slug}
-                onChange={(event) =>
-                  setEditFlavorForm((current) => ({ ...current, slug: event.target.value }))
+                onChange={(e) =>
+                  setEditFlavorForm((c) => ({ ...c, slug: e.target.value }))
                 }
                 required
               />
@@ -278,19 +566,39 @@ function FlavorEditorContent() {
               <input value={formatDate(selectedFlavor.modified_datetime_utc)} readOnly />
             </label>
           </div>
-          <label className="field">
+          <label className="field" style={{ marginTop: 8 }}>
             <span>Description</span>
             <textarea
               rows={5}
               value={editFlavorForm.description}
-              onChange={(event) =>
-                setEditFlavorForm((current) => ({ ...current, description: event.target.value }))
+              onChange={(e) =>
+                setEditFlavorForm((c) => ({ ...c, description: e.target.value }))
               }
             />
           </label>
-          <button type="submit" className="primaryButton" disabled={flavorSaving}>
-            {flavorSaving ? "Saving..." : "Update flavor"}
-          </button>
+          <div className="rowActions" style={{ marginTop: 16 }}>
+            <button type="submit" className="primaryButton" disabled={flavorSaving}>
+              {flavorSaving ? "Saving..." : "Save changes"}
+            </button>
+            <button
+              type="button"
+              className="ghostButton"
+              onClick={() => {
+                setDuplicateSlug(`${selectedFlavor.slug}-copy`);
+                setDuplicateModal(true);
+              }}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              className="dangerButton"
+              onClick={() => setDeleteFlavorModal(true)}
+              disabled={flavorSaving}
+            >
+              Delete
+            </button>
+          </div>
         </form>
 
         <section className="panel">
@@ -309,7 +617,7 @@ function FlavorEditorContent() {
             <article className="linkCard">
               <span className="panelTag">Test</span>
               <h3>Use the test page</h3>
-              <p className="muted">Preview images visually and run a generation without cluttering this editor.</p>
+              <p className="muted">Preview images and run a live generation without cluttering this editor.</p>
             </article>
             <article className="linkCard">
               <span className="panelTag">History</span>
@@ -320,403 +628,197 @@ function FlavorEditorContent() {
         </section>
       </div>
 
+      {/* Steps chain */}
       <section className="panel">
         <div className="panelHeader">
           <div>
-            <h2>Flavor steps</h2>
-            <p className="muted sectionNote">Each step runs in order. Move steps up or down to change the chain.</p>
+            <h2>Prompt chain steps</h2>
+            <p className="muted sectionNote">
+              Each step runs in sequence. Steps are numbered in execution order — use the arrows to reorder.
+            </p>
           </div>
           <span className="panelTag">{steps.length} steps</span>
         </div>
-        <div className="stepsList">
-          {steps.map((step, index) => {
-            const model = llmModels.find((row) => row.id === step.llm_model_id);
-            const inputType = inputTypes.find((row) => row.id === step.llm_input_type_id);
-            const outputType = outputTypes.find((row) => row.id === step.llm_output_type_id);
-            const stepType = stepTypes.find((row) => row.id === step.humor_flavor_step_type_id);
-            const isEditing = stepEditingId === step.id;
 
-            return (
-              <article key={step.id} className="stepCard">
-                <div className="stepHeader">
-                  <div className="stepTitleBlock">
-                    <p className="eyebrow">Step {index + 1}</p>
-                    <h3>{step.description || "Untitled step"}</h3>
-                  </div>
-                  <div className="rowActions rowActionsWrap">
-                    <button
-                      type="button"
-                      className="ghostButton"
-                      disabled={index === 0 || stepSaving}
-                      onClick={() => void handleMoveStep(step.id, -1)}
-                    >
-                      Move up
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostButton"
-                      disabled={index === steps.length - 1 || stepSaving}
-                      onClick={() => void handleMoveStep(step.id, 1)}
-                    >
-                      Move down
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostButton"
-                      onClick={() => {
-                        setStepEditingId(step.id);
-                        setEditStepForm(toStepForm(step));
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="dangerButton"
-                      disabled={stepSaving}
-                      onClick={() => void handleDeleteStep(step.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+        {steps.length === 0 && (
+          <p className="emptyNotice">
+            No steps yet. Add the first step to start building the prompt chain.
+          </p>
+        )}
+
+        <div className="stepsChain">
+          {steps.map((step, index) => (
+            <div key={step.id} className="stepChainItem">
+              <StepCard
+                step={step}
+                index={index}
+                total={steps.length}
+                llmModels={llmModels}
+                inputTypes={inputTypes}
+                outputTypes={outputTypes}
+                stepTypes={stepTypes}
+                saving={stepSaving}
+                onEdit={() => {
+                  setEditStepForm(toStepForm(step));
+                  setEditStepModal({ open: true, stepId: step.id });
+                }}
+                onDelete={() => setDeleteStepModal({ open: true, stepId: step.id })}
+                onMoveUp={() => void handleMoveStep(step.id, -1)}
+                onMoveDown={() => void handleMoveStep(step.id, 1)}
+              />
+              {index < steps.length - 1 && (
+                <div className="stepConnector">
+                  <div className="stepConnectorLine" />
                 </div>
-
-                {isEditing ? (
-                  <div className="stepEditor">
-                    <div className="fieldGrid">
-                      <label className="field">
-                        <span>Description</span>
-                        <input
-                          value={editStepForm.description}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              description: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Temperature</span>
-                        <input
-                          value={editStepForm.llm_temperature}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              llm_temperature: event.target.value,
-                            }))
-                          }
-                          placeholder="Optional"
-                        />
-                      </label>
-                    </div>
-                    <div className="fieldGrid">
-                      <label className="field">
-                        <span>Model</span>
-                        <select
-                          value={editStepForm.llm_model_id}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              llm_model_id: event.target.value,
-                            }))
-                          }
-                        >
-                          {llmModels.map((modelRow) => (
-                            <option key={modelRow.id} value={modelRow.id}>
-                              {modelRow.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Step type</span>
-                        <select
-                          value={editStepForm.humor_flavor_step_type_id}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              humor_flavor_step_type_id: event.target.value,
-                            }))
-                          }
-                        >
-                          {stepTypes.map((row) => (
-                            <option key={row.id} value={row.id}>
-                              {getLookupLabel(row)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Input type</span>
-                        <select
-                          value={editStepForm.llm_input_type_id}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              llm_input_type_id: event.target.value,
-                            }))
-                          }
-                        >
-                          {inputTypes.map((row) => (
-                            <option key={row.id} value={row.id}>
-                              {getLookupLabel(row)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Output type</span>
-                        <select
-                          value={editStepForm.llm_output_type_id}
-                          onChange={(event) =>
-                            setEditStepForm((current) => ({
-                              ...current,
-                              llm_output_type_id: event.target.value,
-                            }))
-                          }
-                        >
-                          {outputTypes.map((row) => (
-                            <option key={row.id} value={row.id}>
-                              {getLookupLabel(row)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <label className="field">
-                      <span>System prompt</span>
-                      <textarea
-                        rows={7}
-                        value={editStepForm.llm_system_prompt}
-                        onChange={(event) =>
-                          setEditStepForm((current) => ({
-                            ...current,
-                            llm_system_prompt: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      <span>User prompt</span>
-                      <textarea
-                        rows={9}
-                        value={editStepForm.llm_user_prompt}
-                        onChange={(event) =>
-                          setEditStepForm((current) => ({
-                            ...current,
-                            llm_user_prompt: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <div className="rowActions">
-                      <button
-                        type="button"
-                        className="primaryButton"
-                        disabled={stepSaving}
-                        onClick={() => void handleSaveStep(step.id)}
-                      >
-                        {stepSaving ? "Saving..." : "Save step"}
-                      </button>
-                      <button type="button" className="ghostButton" onClick={() => setStepEditingId(null)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="stepMetaGrid">
-                      <div>
-                        <span>Type</span>
-                        <strong>{getLookupLabel(stepType)}</strong>
-                      </div>
-                      <div>
-                        <span>Model</span>
-                        <strong>{model?.name || `#${step.llm_model_id}`}</strong>
-                      </div>
-                      <div>
-                        <span>Input</span>
-                        <strong>{getLookupLabel(inputType)}</strong>
-                      </div>
-                      <div>
-                        <span>Output</span>
-                        <strong>{getLookupLabel(outputType)}</strong>
-                      </div>
-                      <div>
-                        <span>Temperature</span>
-                        <strong>{step.llm_temperature ?? "Default"}</strong>
-                      </div>
-                      <div>
-                        <span>Order</span>
-                        <strong>{step.order_by}</strong>
-                      </div>
-                    </div>
-                    <div className="promptGrid">
-                      <div className="promptBlock">
-                        <span>System prompt</span>
-                        <pre>{step.llm_system_prompt || "No system prompt."}</pre>
-                      </div>
-                      <div className="promptBlock">
-                        <span>User prompt</span>
-                        <pre>{step.llm_user_prompt || "No user prompt."}</pre>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </article>
-            );
-          })}
+              )}
+            </div>
+          ))}
         </div>
 
-        <form className="panel nestedPanel" onSubmit={handleCreateStep}>
-          <div className="panelHeader">
-            <div>
-              <h3>Add step</h3>
-              <p className="muted sectionNote">New steps are appended to the end of the flavor chain.</p>
-            </div>
-            <span className="panelTag">Create</span>
-          </div>
-          <div className="fieldGrid">
-            <label className="field">
-              <span>Description</span>
-              <input
-                value={createStepForm.description}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="field">
-              <span>Temperature</span>
-              <input
-                value={createStepForm.llm_temperature}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    llm_temperature: event.target.value,
-                  }))
-                }
-                placeholder="Optional"
-              />
-            </label>
-          </div>
-          <div className="fieldGrid">
-            <label className="field">
-              <span>Model</span>
-              <select
-                value={createStepForm.llm_model_id}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    llm_model_id: event.target.value,
-                  }))
-                }
-                required
-              >
-                <option value="">Select a model</option>
-                {llmModels.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Step type</span>
-              <select
-                value={createStepForm.humor_flavor_step_type_id}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    humor_flavor_step_type_id: event.target.value,
-                  }))
-                }
-                required
-              >
-                <option value="">Select a step type</option>
-                {stepTypes.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {getLookupLabel(row)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Input type</span>
-              <select
-                value={createStepForm.llm_input_type_id}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    llm_input_type_id: event.target.value,
-                  }))
-                }
-                required
-              >
-                <option value="">Select input type</option>
-                {inputTypes.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {getLookupLabel(row)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Output type</span>
-              <select
-                value={createStepForm.llm_output_type_id}
-                onChange={(event) =>
-                  setCreateStepForm((current) => ({
-                    ...current,
-                    llm_output_type_id: event.target.value,
-                  }))
-                }
-                required
-              >
-                <option value="">Select output type</option>
-                {outputTypes.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {getLookupLabel(row)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="field">
-            <span>System prompt</span>
-            <textarea
-              rows={6}
-              value={createStepForm.llm_system_prompt}
-              onChange={(event) =>
-                setCreateStepForm((current) => ({
-                  ...current,
-                  llm_system_prompt: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label className="field">
-            <span>User prompt</span>
-            <textarea
-              rows={8}
-              value={createStepForm.llm_user_prompt}
-              onChange={(event) =>
-                setCreateStepForm((current) => ({
-                  ...current,
-                  llm_user_prompt: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <button type="submit" className="primaryButton" disabled={stepSaving}>
-            {stepSaving ? "Saving..." : "Create step"}
-          </button>
-        </form>
+        <button
+          type="button"
+          className="addStepButton"
+          onClick={() => {
+            setCreateStepForm(EMPTY_STEP_FORM);
+            setCreateStepModal(true);
+          }}
+        >
+          + Add step
+        </button>
       </section>
+
+      {/* ── Edit step modal ── */}
+      <Modal
+        open={editStepModal.open}
+        onClose={() => setEditStepModal({ open: false, stepId: null })}
+        title="Edit step"
+        subtitle="Update the configuration and prompts for this step."
+        size="lg"
+      >
+        <StepFormFields
+          form={editStepForm}
+          onChange={(update) => setEditStepForm((c) => ({ ...c, ...update }))}
+          llmModels={llmModels}
+          inputTypes={inputTypes}
+          outputTypes={outputTypes}
+          stepTypes={stepTypes}
+        />
+        <div className="modalActions">
+          <button
+            type="button"
+            className="ghostButton"
+            onClick={() => setEditStepModal({ open: false, stepId: null })}
+            disabled={stepSaving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={() => void handleSaveStep()}
+            disabled={stepSaving}
+          >
+            {stepSaving ? "Saving..." : "Save step"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Create step modal ── */}
+      <Modal
+        open={createStepModal}
+        onClose={() => setCreateStepModal(false)}
+        title="Add step"
+        subtitle="New steps are appended to the end of the flavor chain."
+        size="lg"
+      >
+        <StepFormFields
+          form={createStepForm}
+          onChange={(update) => setCreateStepForm((c) => ({ ...c, ...update }))}
+          llmModels={llmModels}
+          inputTypes={inputTypes}
+          outputTypes={outputTypes}
+          stepTypes={stepTypes}
+        />
+        <div className="modalActions">
+          <button
+            type="button"
+            className="ghostButton"
+            onClick={() => setCreateStepModal(false)}
+            disabled={stepSaving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={() => void handleCreateStep()}
+            disabled={stepSaving}
+          >
+            {stepSaving ? "Creating..." : "Create step"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Delete step confirm modal ── */}
+      <ConfirmModal
+        open={deleteStepModal.open}
+        onClose={() => setDeleteStepModal({ open: false, stepId: null })}
+        onConfirm={() => void handleDeleteStep()}
+        title="Delete step?"
+        message="This will remove the step and reorder the remaining chain. This action cannot be undone."
+        confirmLabel="Delete step"
+        loading={stepSaving}
+      />
+
+      {/* ── Delete flavor confirm modal ── */}
+      <ConfirmModal
+        open={deleteFlavorModal}
+        onClose={() => setDeleteFlavorModal(false)}
+        onConfirm={() => void handleDeleteFlavor()}
+        title={`Delete "${selectedFlavor.slug}"?`}
+        message="This will permanently delete the flavor. It will fail if dependent rows (captions, etc.) still exist."
+        confirmLabel="Delete flavor"
+        loading={flavorSaving}
+      />
+
+      {/* ── Duplicate flavor modal ── */}
+      <Modal
+        open={duplicateModal}
+        onClose={() => setDuplicateModal(false)}
+        title="Duplicate flavor"
+        subtitle={`Duplicating "${selectedFlavor.slug}" — all ${steps.length} step(s) will be copied.`}
+        size="sm"
+      >
+        <div className="stackForm">
+          <label className="field">
+            <span>New flavor slug</span>
+            <input
+              value={duplicateSlug}
+              onChange={(e) => setDuplicateSlug(e.target.value)}
+              placeholder={`${selectedFlavor.slug}-copy`}
+              autoFocus
+            />
+          </label>
+        </div>
+        <div className="modalActions">
+          <button
+            type="button"
+            className="ghostButton"
+            onClick={() => setDuplicateModal(false)}
+            disabled={duplicateSaving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={() => void handleDuplicate()}
+            disabled={duplicateSaving || !duplicateSlug.trim()}
+          >
+            {duplicateSaving ? "Duplicating..." : "Duplicate flavor"}
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

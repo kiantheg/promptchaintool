@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -19,12 +20,30 @@ import {
   listHumorFlavors,
 } from "@/lib/supabase-rest";
 
+/* ===== TOAST ===== */
+type ToastType = "success" | "error";
+type ToastItem = { id: string; message: string; type: ToastType; exiting: boolean };
+
+type ToastContextValue = {
+  showToast: (message: string, type?: ToastType) => void;
+};
+
+const ToastContext = createContext<ToastContextValue | null>(null);
+
+export function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToast must be used within PromptChainShell");
+  return ctx;
+}
+
+/* ===== WORKSPACE CONTEXT ===== */
 type WorkspaceContextValue = {
   token: string;
   me: Profile;
   flavors: HumorFlavor[];
   selectedFlavor: HumorFlavor | null;
   refreshFlavors: () => Promise<HumorFlavor[]>;
+  showToast: (message: string, type?: ToastType) => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -55,6 +74,22 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
   const [authorized, setAuthorized] = useState(false);
   const [flavors, setFlavors] = useState<HumorFlavor[]>([]);
   const [flavorFilter, setFlavorFilter] = useState("");
+
+  /* Toast state */
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = useCallback((message: string, type: ToastType = "success") => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, message, type, exiting: false }]);
+    setTimeout(() => {
+      setToasts((current) =>
+        current.map((t) => (t.id === id ? { ...t, exiting: true } : t)),
+      );
+      setTimeout(() => {
+        setToasts((current) => current.filter((t) => t.id !== id));
+      }, 220);
+    }, 3200);
+  }, []);
 
   const selectedFlavor = useMemo(
     () => flavors.find((flavor) => flavor.id === selectedFlavorId) ?? null,
@@ -142,144 +177,195 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
     window.location.replace("/login");
   };
 
+  /* Toast container is always rendered */
+  const toastContainer = (
+    <div className="toastContainer">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`toast ${toast.type === "success" ? "toastSuccess" : "toastError"}${toast.exiting ? " toastExiting" : ""}`}
+        >
+          {toast.type === "success" ? "✓ " : "✕ "}
+          {toast.message}
+        </div>
+      ))}
+    </div>
+  );
+
   if (loading) {
     return (
-      <main className="shell">
-        <section className="loadingPanel">
-          <p className="eyebrow">Prompt Chain Tool</p>
-          <h1>{status}</h1>
-          <p className="muted">Pulling your session, admin flags, and prompt-chain workspace.</p>
-        </section>
-      </main>
+      <>
+        {toastContainer}
+        <main className="shell">
+          <section className="loadingPanel panel">
+            <p className="eyebrow">Prompt Chain Tool</p>
+            <h1>{status}</h1>
+            <p className="muted">Pulling your session, admin flags, and prompt-chain workspace.</p>
+          </section>
+        </main>
+      </>
     );
   }
 
   if (!authorized || !token || !me) {
     return (
-      <main className="shell">
-        <section className="loadingPanel">
-          <p className="eyebrow">Access Control</p>
-          <h1>Admin access required</h1>
-          <p className="muted">
-            This page only works when <code>profiles.is_superadmin = true</code> or{" "}
-            <code>profiles.is_matrix_admin = true</code>.
-          </p>
-          {me && (
+      <>
+        {toastContainer}
+        <main className="shell">
+          <section className="loadingPanel panel">
+            <p className="eyebrow">Access Control</p>
+            <h1>Admin access required</h1>
             <p className="muted">
-              Signed in as {me.email ?? me.id}
-              {me.is_superadmin ? " · superadmin" : ""}
-              {me.is_matrix_admin ? " · matrix admin" : ""}
+              This page only works when <code>profiles.is_superadmin = true</code> or{" "}
+              <code>profiles.is_matrix_admin = true</code>.
             </p>
-          )}
-          {error && <p className="errorBanner">{error}</p>}
-          <button type="button" className="ghostButton" onClick={signOut}>
-            Sign out
-          </button>
-        </section>
-      </main>
+            {me && (
+              <p className="muted">
+                Signed in as {me.email ?? me.id}
+                {me.is_superadmin ? " · superadmin" : ""}
+                {me.is_matrix_admin ? " · matrix admin" : ""}
+              </p>
+            )}
+            {error && <p className="errorBanner">{error}</p>}
+            <button type="button" className="ghostButton" onClick={signOut}>
+              Sign out
+            </button>
+          </section>
+        </main>
+      </>
     );
   }
 
+  /* User initials for avatar */
+  const userInitial = (me.first_name?.charAt(0) || me.email?.charAt(0) || "A").toUpperCase();
+  const userDisplayName = me.first_name || me.email || me.id;
+  const userRole = me.is_superadmin ? "Superadmin" : "Matrix Admin";
+
   return (
-    <WorkspaceContext.Provider value={{ token, me, flavors, selectedFlavor, refreshFlavors }}>
-      <main className="shell">
-        <div className="appFrame">
-          <aside className="sidebar">
-            <Link href="/" className="sidebarTop sidebarHomeLink">
-              <p className="eyebrow">Prompt Chain Tool</p>
-              <h1>Humor flavor workspace</h1>
-              <p className="muted sectionNote">
-                Pick a flavor from the left. Once selected, use the tabs in the main area to move
-                between Edit, Test, and History.
-              </p>
-            </Link>
-
-            <section className="panel compactPanel railSection flavorRail">
-              <div className="panelHeader panelHeaderTight">
-                <div>
-                  <h2>Browse flavors</h2>
-                  <p className="muted sectionNote">Select a flavor to open its tabs in the main workspace.</p>
-                </div>
-                <span className="pill">{flavors.length}</span>
-              </div>
-
-              <div className="toolbarRow toolbarRowCompact">
-                <input
-                  className="searchInput"
-                  placeholder="Filter flavors..."
-                  value={flavorFilter}
-                  onChange={(event) => setFlavorFilter(event.target.value)}
-                />
-              </div>
-
-              <div className="flavorList flavorListCompact">
-                {filteredFlavors.map((flavor) => {
-                  const href = `/flavors/${flavor.id}`;
-                  const isActive = pathname === href || pathname.startsWith(`${href}/`);
-
-                  return (
-                    <Link
-                      key={flavor.id}
-                      href={href}
-                      className={isActive ? "flavorCard flavorCardActive" : "flavorCard"}
-                    >
-                      <div className="flavorCardTop">
-                        <span className="flavorSlug">{flavor.slug}</span>
-                        <span className="flavorMeta">#{flavor.id}</span>
-                      </div>
-                      <span className="flavorDescription">{flavor.description || "No description yet."}</span>
-                    </Link>
-                  );
-                })}
-                {filteredFlavors.length === 0 && (
-                  <p className="muted emptyNotice">No flavors match this filter.</p>
-                )}
-              </div>
-            </section>
-
-          </aside>
-
-          <section className="mainStage">
-            <header className="hero panel">
-              <div className="heroCopy">
-                <p className="eyebrow">{selectedFlavor ? "Flavor workspace" : "Dashboard"}</p>
-                <h2>{selectedFlavor ? selectedFlavor.slug : "Choose a flavor"}</h2>
-                <p className="muted sectionNote">
-                  Signed in as {me.email ?? me.id}. This app uses the same Supabase project as your
-                  other admin tools.
+    <ToastContext.Provider value={{ showToast }}>
+      <WorkspaceContext.Provider value={{ token, me, flavors, selectedFlavor, refreshFlavors, showToast }}>
+        {toastContainer}
+        <main className="shell">
+          <div className="appFrame">
+            {/* ─── Sidebar ─── */}
+            <aside className="sidebar">
+              {/* Brand */}
+              <Link href="/" className="sidebarBrand">
+                <span className="sidebarBrandEyebrow">Prompt Chain Tool</span>
+                <p className="sidebarBrandName">Humor Flavor Workspace</p>
+                <p className="sidebarBrandDesc">
+                  Pick a flavor to edit its chain, run test generations, and view history.
                 </p>
-              </div>
-              <div className="heroActions">
-                <Link href="/flavors/new" className="primaryButton primaryLinkButton">
-                  + New flavor
-                </Link>
-                <ThemeModeControl />
-                <div className="identityCard">
-                  <span>{me.is_superadmin ? "Superadmin" : "Matrix admin"}</span>
-                  <strong>{me.first_name || me.email || me.id}</strong>
-                </div>
-                <button type="button" className="ghostButton" onClick={signOut}>
-                  Sign out
-                </button>
-              </div>
-            </header>
+              </Link>
 
-            {selectedFlavor && (
-              <nav className="flavorNav panel">
-                <div className="navIntro">
-                  <span className="eyebrow">Current Pages</span>
-                  <p className="muted sectionNote">
-                    You are working on <strong>{selectedFlavor.slug}</strong>. Choose a tab:
-                  </p>
+              {/* Flavor rail */}
+              <section className="panel compactPanel railSection flavorRail">
+                <div className="panelHeader panelHeaderTight">
+                  <div>
+                    <h2>Flavors</h2>
+                    <p className="muted sectionNote" style={{ fontSize: 12 }}>
+                      Select a flavor to open its workspace.
+                    </p>
+                  </div>
+                  <span className="pill">{flavors.length}</span>
                 </div>
-                <div className="navLinkRow">
+
+                <div className="toolbarRow toolbarRowCompact">
+                  <input
+                    className="searchInput"
+                    placeholder="Filter flavors..."
+                    value={flavorFilter}
+                    onChange={(event) => setFlavorFilter(event.target.value)}
+                  />
+                </div>
+
+                <div className="flavorList flavorListCompact">
+                  {filteredFlavors.map((flavor) => {
+                    const href = `/flavors/${flavor.id}`;
+                    const isActive = pathname === href || pathname.startsWith(`${href}/`);
+
+                    return (
+                      <Link
+                        key={flavor.id}
+                        href={href}
+                        className={isActive ? "flavorCard flavorCardActive" : "flavorCard"}
+                      >
+                        <div className="flavorCardTop">
+                          <span className="flavorSlug">{flavor.slug}</span>
+                          <span className="flavorMeta" style={{ fontSize: 11 }}>#{flavor.id}</span>
+                        </div>
+                        <span className="flavorDescription">
+                          {flavor.description || "No description yet."}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                  {filteredFlavors.length === 0 && (
+                    <p className="muted emptyNotice" style={{ fontSize: 13 }}>
+                      No flavors match this filter.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* User identity */}
+              <div className="sidebarUser">
+                <div className="sidebarUserInfo">
+                  <div className="sidebarUserAvatar">{userInitial}</div>
+                  <div className="sidebarUserDetails">
+                    <span className="sidebarUserName">{userDisplayName}</span>
+                    <span className="sidebarUserRole">{userRole}</span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <ThemeModeControl compact />
+                  <button
+                    type="button"
+                    className="ghostButton"
+                    onClick={signOut}
+                    style={{ flex: 1, fontSize: 13, padding: "8px 12px" }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </aside>
+
+            {/* ─── Main stage ─── */}
+            <section className="mainStage">
+              {/* Header / Hero */}
+              <header className="panel" style={{ padding: "18px 24px" }}>
+                <div className="heroV2">
+                  <div className="heroV2Title">
+                    <p className="eyebrow" style={{ marginBottom: 4 }}>
+                      {selectedFlavor ? "Flavor workspace" : "Dashboard"}
+                    </p>
+                    <h2 style={{ marginBottom: 0 }}>
+                      {selectedFlavor ? selectedFlavor.slug : "Humor Flavors"}
+                    </h2>
+                  </div>
+                  <div className="heroV2Actions">
+                    <Link href="/flavors/new" className="primaryButton primaryLinkButton">
+                      + New flavor
+                    </Link>
+                  </div>
+                </div>
+              </header>
+
+              {/* Flavor tab nav */}
+              {selectedFlavor && (
+                <nav className="panel flavorNav2">
+                  <span className="navFlavorLabel">{selectedFlavor.slug}</span>
+                  <span className="navDivider">›</span>
                   <Link
                     href={`/flavors/${selectedFlavor.id}`}
                     className={
-                      pathname === `/flavors/${selectedFlavor.id}` ? "navLink navLinkActive" : "navLink"
+                      pathname === `/flavors/${selectedFlavor.id}`
+                        ? "navLink navLinkActive"
+                        : "navLink"
                     }
                   >
-                    Edit flavor
+                    Edit
                   </Link>
                   <Link
                     href={`/flavors/${selectedFlavor.id}/test`}
@@ -289,7 +375,7 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                         : "navLink"
                     }
                   >
-                    Test flavor
+                    Test
                   </Link>
                   <Link
                     href={`/flavors/${selectedFlavor.id}/history`}
@@ -301,15 +387,15 @@ export function PromptChainShell({ selectedFlavorId = null, children }: PromptCh
                   >
                     History
                   </Link>
-                </div>
-              </nav>
-            )}
+                </nav>
+              )}
 
-            {error && <p className="errorBanner">{error}</p>}
-            {children}
-          </section>
-        </div>
-      </main>
-    </WorkspaceContext.Provider>
+              {error && <p className="errorBanner">{error}</p>}
+              {children}
+            </section>
+          </div>
+        </main>
+      </WorkspaceContext.Provider>
+    </ToastContext.Provider>
   );
 }
