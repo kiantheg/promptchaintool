@@ -53,6 +53,45 @@
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
 }
 
+/* Dark-mode class-level overrides — fix hardcoded light backgrounds */
+
+/* Page header: was near-white gradient, now dark to match surface */
+:root[data-theme="dark"] .pageHeader {
+  background: linear-gradient(180deg, rgba(30, 24, 17, 0.96), rgba(22, 18, 12, 0.9));
+}
+
+/* Prompt display blocks inside step cards: was near-white, now dark surface */
+:root[data-theme="dark"] .promptBlock {
+  background: rgba(247, 239, 227, 0.04);
+  border-color: rgba(247, 239, 227, 0.1);
+}
+
+/* Modal header: was near-white gradient, now dark */
+:root[data-theme="dark"] .modalHeader {
+  background: linear-gradient(180deg, rgba(30, 24, 17, 0.98), rgba(22, 18, 12, 0.92));
+  border-bottom-color: rgba(247, 239, 227, 0.08);
+}
+
+/* Step card inner borders: hardcoded warm-dark → light-on-dark */
+:root[data-theme="dark"] .stepCardBody {
+  border-top-color: rgba(247, 239, 227, 0.08);
+}
+
+:root[data-theme="dark"] .stepMetaChip {
+  border-color: rgba(247, 239, 227, 0.1);
+  background: rgba(247, 239, 227, 0.05);
+}
+
+/* Nav link hover: near-invisible rgba(32,23,17,0.05) on dark → use a light tint */
+:root[data-theme="dark"] .navLink:hover {
+  background: rgba(247, 239, 227, 0.07);
+}
+
+/* Inline code chips: dark tint background → light tint for readability */
+:root[data-theme="dark"] code {
+  background: rgba(247, 239, 227, 0.1);
+}
+
 /* ===== BASE RESET ===== */
 * {
   box-sizing: border-box;
