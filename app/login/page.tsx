@@ -52,52 +52,67 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="shell authShell">
-      <div className="authLayout">
-        <section className="authPanel authBrandPanel">
-          <div className="authTopRow">
-            <div />
-            <ThemeModeControl compact />
-          </div>
-          <p className="eyebrow">Prompt Chain Tool</p>
-          <h1>Humor flavor workspace</h1>
-          <p className="muted sectionNote">
-            Manage humor flavors, test prompt chains, and inspect caption history from one place.
-          </p>
-          <div className="authFeatureList">
-            <article className="authFeatureCard">
-              <span className="panelTag">Edit</span>
-              <h3>Build prompt chains</h3>
-              <p className="muted">Create flavors, reorder steps, and keep the chain structure clean.</p>
-            </article>
-            <article className="authFeatureCard">
-              <span className="panelTag">Test</span>
-              <h3>Preview with images</h3>
-              <p className="muted">Choose public images visually and run generation before publishing changes.</p>
-            </article>
-            <article className="authFeatureCard">
-              <span className="panelTag">History</span>
-              <h3>Review model output</h3>
-              <p className="muted">See saved captions and raw model responses without leaving the workspace.</p>
-            </article>
-          </div>
-        </section>
+    <main className="authPage">
+      <div className="authThemeToggle">
+        <ThemeModeControl compact />
+      </div>
 
-        <section className="authPanel authActionPanel">
-          <div className="authTopRow authTopRowMobileOnly">
-            <ThemeModeControl compact />
-          </div>
-          <p className="eyebrow">Admin Access</p>
-          <h2>Sign in with Google</h2>
-          <p className="muted sectionNote">
-            After login, the app will verify <code>profiles.is_superadmin</code> or{" "}
-            <code>profiles.is_matrix_admin</code> before opening the workspace.
+      <div className="authCard">
+        {/* Brand section */}
+        <div className="authCardBrand">
+          <p className="authEyebrow">Prompt Chain Tool</p>
+          <h1 className="authTitle">Humor Flavor Workspace</h1>
+          <p className="authSubtitle">
+            Manage humor flavors, test prompt chains, and inspect caption history — all from one place.
           </p>
-          <button type="button" className="primaryButton authPrimaryButton" onClick={signInWithGoogle} disabled={loading}>
-            {loading ? "Opening Google..." : "Continue with Google"}
+
+          <div className="authFeatureList">
+            <div className="authFeatureRow">
+              <span className="authFeatureTag">Edit</span>
+              <span className="authFeatureText">
+                Build prompt chains — create flavors, reorder steps, keep the chain clean.
+              </span>
+            </div>
+            <div className="authFeatureRow">
+              <span className="authFeatureTag">Test</span>
+              <span className="authFeatureText">
+                Pick a real image and run live generation before publishing changes.
+              </span>
+            </div>
+            <div className="authFeatureRow">
+              <span className="authFeatureTag">History</span>
+              <span className="authFeatureText">
+                Review saved captions and raw model responses without leaving the workspace.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sign-in section */}
+        <div className="authCardAction">
+          <p className="authActionLabel">Admin access required</p>
+
+          <button
+            type="button"
+            className="authGoogleButton"
+            onClick={() => void signInWithGoogle()}
+            disabled={loading}
+          >
+            {loading ? "Opening Google…" : "Continue with Google"}
           </button>
-          {message && <p className="errorBanner">{message}</p>}
-        </section>
+
+          <p className="authNote">
+            After signing in, the app verifies{" "}
+            <code>profiles.is_superadmin</code> or{" "}
+            <code>profiles.is_matrix_admin</code> before granting access.
+          </p>
+
+          {message && (
+            <p className="errorBanner" style={{ marginTop: "1rem", marginBottom: 0 }}>
+              {message}
+            </p>
+          )}
+        </div>
       </div>
     </main>
   );
