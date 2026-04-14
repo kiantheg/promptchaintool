@@ -73,7 +73,7 @@ export function Modal({
       }}
     >
       <div className={sizeClass ? `modalBox ${sizeClass}` : "modalBox"}>
-        {!hideHeader && (title || true) && (
+        {!hideHeader && (
           <div className="modalHeader">
             <div style={{ minWidth: 0 }}>
               {title && <h2>{title}</h2>}
@@ -89,7 +89,7 @@ export function Modal({
             </button>
           </div>
         )}
-        {children}
+        <div className="modalBody">{children}</div>
       </div>
     </div>
   );
@@ -122,7 +122,7 @@ export function ConfirmModal({
         <div className="confirmDialogIcon">⚠️</div>
         <p className="confirmDialogTitle">{title}</p>
         <p className="confirmDialogText">{message}</p>
-        <div className="modalActions" style={{ width: "100%", paddingTop: 0, borderTop: "none" }}>
+        <div style={{ display: "flex", gap: "0.65rem", justifyContent: "center", width: "100%" }}>
           <button type="button" className="ghostButton" onClick={onClose} disabled={loading}>
             {cancelLabel}
           </button>
